@@ -555,7 +555,8 @@ public final class ControlCenterActivity extends Activity {
         LinearLayout info = new LinearLayout(this);
         info.setOrientation(LinearLayout.HORIZONTAL);
         dashAdb = text(adb.isConnected() ? "Connected" : "Not connected", 22, TEXT, true);
-        TextView adbSub = text("Needed for monitor details, disable and uninstall", 12, DIM, false);
+        TextView adbSub = text(adb.isConnected() ? "Network debugging is on" : (settingOn("adb_enabled")
+                ? "Debugging is on but not connected: press to retry" : "Network debugging is off: press for the steps"), 12, DIM, false);
         adbSub.setGravity(Gravity.CENTER);
         int disabled = recorded(KEY_DISABLED).size();
         TextView off = text(String.valueOf(disabled), 22, TEXT, true);
@@ -568,7 +569,7 @@ public final class ControlCenterActivity extends Activity {
         View[] tops = {dashAdb, off, home};
         TextView[] infoSubs = {adbSub, offSub, homeSub};
         String[] infoTitles = {"ADB LINK", "DEBLOAT", "HOME"};
-        View.OnClickListener[] go = {v -> connectAdb(true), v -> show(2), v -> show(4)};
+        View.OnClickListener[] go = {v -> { if (adb.isConnected()) show(4); else connectAdb(true); }, v -> show(2), v -> show(4)};
         for (int i = 0; i < 3; i++) {
             ((TextView) tops[i]).setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1f);
@@ -1552,9 +1553,63 @@ public final class ControlCenterActivity extends Activity {
         return ri == null ? "" : ri.activityInfo.packageName + "/" + ri.activityInfo.name;
     }
 
+    private boolean settingOn(String key) {
+        try {
+            return Settings.Global.getInt(getContentResolver(), key, 0) == 1;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /** Network debugging at a glance. Android gives apps no way to switch it ON; it can be switched OFF through the ADB link. */
+    private View debuggingCard() {
+        final boolean linked = adb.isConnected();
+        final boolean enabled = settingOn("adb_enabled");
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(22), dp(18), dp(22), dp(14));
+        card.setBackground(Ui.panel(this, 18));
+        card.addView(text("NETWORK DEBUGGING", 13, DIM, false));
+        TextView state = text(linked ? "ON  ·  connected" : (enabled ? "ON  ·  not connected" : "OFF"), 26, linked ? ACCENT : TEXT, true);
+        state.setPadding(0, dp(2), 0, dp(2));
+        card.addView(state);
+        TextView why = text(linked
+                ? "Needed for monitor details, disable and uninstall. You can turn it off when you are done: packages you disabled stay disabled."
+                : "Needed for monitor details, disable and uninstall. Android does not let an app switch it on, so it is turned on in Developer options.",
+                13, DIM, false);
+        why.setPadding(0, 0, 0, dp(10));
+        card.addView(why);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        if (linked) {
+            Button off = button("Turn off network debugging", v -> confirm("Turn off network debugging?",
+                    "The Control Center loses its ADB link until you switch debugging on again in Developer options "
+                            + "(Settings > Device Preferences > Developer options). Your changes stay in place.",
+                    () -> shell("settings put global adb_enabled 0", r -> {
+                        setStatus(r.startsWith("ERROR") ? "Could not turn it off: " + r : "Network debugging turned off", r.startsWith("ERROR") ? DANGER : ACCENT);
+                        main.postDelayed(() -> { if (tab == 4) show(4); }, 1200);
+                    })));
+            off.setTextColor(DANGER);
+            row.addView(off);
+        } else {
+            row.addView(button("How to turn it on", v -> needAdbDialog()));
+            row.addView(button("Open Developer options", v -> openDeveloperOptions()));
+        }
+        row.addView(button("Reconnect", v -> {
+            connectAdb(true);
+            main.postDelayed(() -> { if (tab == 4) show(4); }, 2500);
+        }));
+        HorizontalScrollerHolder.wrap(this, card, row);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, 0, dp(14), dp(14));
+        card.setLayoutParams(lp);
+        return card;
+    }
+
     private void showLauncherSettings() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
+        box.addView(debuggingCard());
         final boolean on = currentHome().startsWith(getPackageName() + "/");
         box.addView(button("Start HyperLauncher on start: " + (on ? "ON" : "OFF"), v -> {
             if (!adb.isConnected()) {
