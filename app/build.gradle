@@ -15,6 +15,25 @@ android {
         versionName '3.2-hyper1'
     }
 
+    flavorDimensions 'edition'
+    productFlavors {
+        // full: the Control Center with debloat, disable and uninstall, through the TV's own network ADB.
+        full {
+            dimension 'edition'
+            buildConfigField 'boolean', 'ADB', 'true'
+        }
+        // lite: no network ADB and no INTERNET permission; monitor, app list, launcher settings and the system's own dialogs only.
+        lite {
+            dimension 'edition'
+            versionNameSuffix '-lite'
+            buildConfigField 'boolean', 'ADB', 'false'
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
     buildTypes {
         release {
             // R8 strips and optimises the code (AndroidX included): smaller APK, faster start on a slow TV CPU.

@@ -1,6 +1,7 @@
 package com.hyperlauncher.control;
 
 import android.app.Activity;
+import com.gathin.tvhome.BuildConfig;
 import com.gathin.tvhome.Icons;
 import com.gathin.tvhome.Ui;
 import android.app.ActivityManager;
@@ -58,6 +59,8 @@ public final class ControlCenterActivity extends Activity {
                     + "|com\\.google\\.android\\.(gms|gsf|permissioncontroller|packageinstaller|ext\\..*|overlay\\..*"
                     + "|modulemetadata|vending|tungsten\\.setupwraith|tv\\.dial|inputmethod\\..*)"
                     + "|com\\.hyperlauncher\\.tv|com\\.gathin\\.tvhome|com\\.cvte\\.tv\\.hkcfac|mediatek\\.factorymenu\\.ui)$");
+    /** False in the Lite edition: no ADB client is built in and the page set shrinks to what Android allows an app. */
+    private static final boolean ADB = BuildConfig.ADB;
     private static final String PREFS = "control_center";
     private static final String KEY_DISABLED = "disabled_by_us";
     private static final String KEY_UNINSTALLED = "uninstalled_by_us";
@@ -150,13 +153,14 @@ public final class ControlCenterActivity extends Activity {
         tabs = new RailItem[names.length];
         // Logical tab ids: Monitor 0, Apps 1, Debloat 2, Home & Theme 3, Settings 4, Overview 5; this is the order on screen.
         for (int index : new int[]{5, 3, 1, 2, 0, 4}) {
+            if (!ADB && index == 2) continue;
             tabs[index] = new RailItem(names[index], kinds[index], v -> show(index));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
             lp.setMargins(0, 0, 0, dp(4));
             rail.addView(tabs[index], lp);
         }
         rail.addView(new View(this), new LinearLayout.LayoutParams(0, 0, 1f));
-        rail.addView(new RailItem("ADB connect", Icons.PLUG, v -> connectAdb(true)), new LinearLayout.LayoutParams(-1, -2));
+        if (ADB) rail.addView(new RailItem("ADB connect", Icons.PLUG, v -> connectAdb(true)), new LinearLayout.LayoutParams(-1, -2));
         root.addView(rail, new LinearLayout.LayoutParams(dp(250), -1));
 
         LinearLayout column = new LinearLayout(this);
@@ -196,7 +200,8 @@ public final class ControlCenterActivity extends Activity {
         setStatus("Ready", DIM);
         tabs[5].requestFocus();
         show(5);
-        connectAdb(false);
+        if (ADB) connectAdb(false);
+        else setStatus("Lite edition: no ADB and no network access", ACCENT);
         runTestHook(getIntent());
     }
 
@@ -287,6 +292,10 @@ public final class ControlCenterActivity extends Activity {
     }
 
     private void needAdbDialog() {
+        if (!ADB) {
+            setStatus("Not available in the Lite edition", DIM);
+            return;
+        }
         if (adbDialogShowing || isFinishing() || isDestroyed()) return;
         adbDialogShowing = true;
         new AlertDialog.Builder(this)
@@ -328,7 +337,7 @@ public final class ControlCenterActivity extends Activity {
     private void show(int index) {
         monitoring = false;
         tab = index;
-        for (int i = 0; i < tabs.length; i++) tabs[i].setActive(i == index);
+        for (int i = 0; i < tabs.length; i++) if (tabs[i] != null) tabs[i].setActive(i == index);
         content.removeAllViews();
         cpuValue = null;
         memRows = null;
@@ -570,6 +579,26 @@ public final class ControlCenterActivity extends Activity {
         TextView[] infoSubs = {adbSub, offSub, homeSub};
         String[] infoTitles = {"ADB LINK", "DEBLOAT", "HOME"};
         View.OnClickListener[] go = {v -> { if (adb.isConnected()) show(4); else connectAdb(true); }, v -> show(2), v -> show(4)};
+        if (!ADB) {
+            int userApps = 0;
+            for (PackageInfo pi : getPackageManager().getInstalledPackages(0))
+                if ((pi.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 0) userApps++;
+            TextView apps = text(String.valueOf(userApps), 22, TEXT, true);
+            TextView appsSub = text("apps installed by you", 12, DIM, false);
+            appsSub.setGravity(Gravity.CENTER);
+            TextView edition = text("Lite", 22, TEXT, true);
+            TextView editionSub = text("No ADB, no network access", 12, DIM, false);
+            editionSub.setGravity(Gravity.CENTER);
+            tops[0] = apps;
+            infoSubs[0] = appsSub;
+            infoTitles[0] = "APPS";
+            go[0] = v -> show(1);
+            tops[1] = edition;
+            infoSubs[1] = editionSub;
+            infoTitles[1] = "EDITION";
+            go[1] = v -> show(4);
+            dashAdb = null;
+        }
         for (int i = 0; i < 3; i++) {
             ((TextView) tops[i]).setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1f);
@@ -690,7 +719,7 @@ public final class ControlCenterActivity extends Activity {
     }
 
     private void showReport(Report r) {
-        String cpuText = r.cpu >= 0 ? String.format("%.0f %%", r.cpu) : (r.shellOk ? "..." : "ADB");
+        String cpuText = r.cpu >= 0 ? String.format("%.0f %%", r.cpu) : (r.shellOk ? "..." : (ADB ? "ADB" : "n/a"));
         String detail = r.cores + " cores";
         if (!r.cpuNote.isEmpty()) detail = r.cpuNote;
         else if (!r.load.isEmpty()) detail += "  ·  load " + r.load;
@@ -728,7 +757,7 @@ public final class ControlCenterActivity extends Activity {
             if (memRows != null) {
                 memRows.removeAllViews();
                 if (r.memTop.isEmpty()) {
-                    memRows.addView(text(r.shellOk ? "Not available on this firmware." : "Needs ADB: press 'ADB connect'.", 14, DIM, false));
+                    memRows.addView(text(r.shellOk ? "Not available on this firmware." : (ADB ? "Needs ADB: press 'ADB connect'." : "Not available in the Lite edition."), 14, DIM, false));
                 } else {
                     long max = 1;
                     for (String[] m : r.memTop) max = Math.max(max, Long.parseLong(m[0]));
@@ -766,7 +795,7 @@ public final class ControlCenterActivity extends Activity {
             long total = cpu[0] - lastCpu[0], idle = cpu[1] - lastCpu[1];
             if (total > 0) r.cpu = 100.0 * (total - idle) / total;
         } else if (!r.shellOk) {
-            r.cpuNote = "needs ADB: Android hides CPU use from apps";
+            r.cpuNote = ADB ? "needs ADB: Android hides CPU use from apps" : "Android hides CPU use from apps";
         } else {
             r.cpuNote = "measuring ...";
         }
@@ -808,7 +837,7 @@ public final class ControlCenterActivity extends Activity {
                 if (f.length == 2 && f[0].matches("\\d+")) r.memTop.add(f);
             }
         } else {
-            r.procs = "Per-process use needs ADB: press 'ADB connect'.";
+            r.procs = ADB ? "Per-process use needs ADB: press 'ADB connect'." : "Per-process use is not available in the Lite edition.";
         }
         return r;
     }
@@ -955,11 +984,12 @@ public final class ControlCenterActivity extends Activity {
         panel.addView(id);
         List<String> items = new ArrayList<>();
         items.add("Open");
-        items.add("Force stop");
+        if (ADB) items.add("Force stop");
         items.add("App info");
         if (!locked) {
-            items.add(info.applicationInfo.enabled ? "Disable" : "Enable");
-            items.add(system ? "Uninstall for this user" : "Uninstall");
+            if (ADB) items.add(info.applicationInfo.enabled ? "Disable" : "Enable");
+            // Lite: only apps you installed, through Android's own uninstall dialog.
+            if (ADB || !system) items.add(system ? "Uninstall for this user" : "Uninstall");
         }
         items.add("Close");
         for (String choice : items) {
@@ -1609,13 +1639,14 @@ public final class ControlCenterActivity extends Activity {
     private void showLauncherSettings() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.addView(debuggingCard());
+        if (ADB) box.addView(debuggingCard());
         final boolean on = currentHome().startsWith(getPackageName() + "/");
         box.addView(button("Start HyperLauncher on start: " + (on ? "ON" : "OFF"), v -> {
             if (!adb.isConnected()) {
-                new AlertDialog.Builder(this).setTitle("Needs ADB, or choose Home yourself")
-                        .setMessage("Making HyperLauncher the Home and switching off the stock launcher needs ADB "
-                                + "(Developer options). Without it, pick HyperLauncher as the default home in the TV's own "
+                new AlertDialog.Builder(this).setTitle(ADB ? "Needs ADB, or choose Home yourself" : "Choose Home in the TV's settings")
+                        .setMessage((ADB ? "Making HyperLauncher the Home and switching off the stock launcher needs ADB "
+                                + "(Developer options). Without it, pick" : "This edition has no ADB, so pick")
+                                + " HyperLauncher as the default home in the TV's own "
                                 + "settings; the round Home button may still open the stock launcher on some TVs.")
                         .setPositiveButton("Open home settings", (d, w) -> {
                             try {
@@ -1624,7 +1655,7 @@ public final class ControlCenterActivity extends Activity {
                                 openDeveloperOptions();
                             }
                         })
-                        .setNeutralButton("How to enable ADB", (d, w) -> needAdbDialog())
+                        .setNeutralButton(ADB ? "How to enable ADB" : null, (d, w) -> needAdbDialog())
                         .setNegativeButton("Close", null).show();
                 return;
             }
@@ -1702,7 +1733,7 @@ public final class ControlCenterActivity extends Activity {
         box.addView(button("Revert to the system (stock) home screen", v -> confirm("Revert to the stock home?",
                 "Re-enables the stock launcher and makes it Home again. HyperLauncher stays installed; "
                         + "come back to it from the app list any time.", this::revertToStock)));
-        box.addView(button("Restore everything HyperLauncher changed", v -> { if (requireAdb()) confirm("Restore everything?",
+        if (ADB) box.addView(button("Restore everything HyperLauncher changed", v -> { if (requireAdb()) confirm("Restore everything?",
                 "Re-enables disabled packages, reinstalls uninstalled ones and puts ad/DNS settings back as they were.",
                 this::restoreEverything); }));
         box.addView(button("TV system settings", v -> startActivity(new Intent(Settings.ACTION_SETTINGS))));

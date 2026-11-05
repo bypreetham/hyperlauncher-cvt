@@ -34,6 +34,27 @@ You need a PC with `adb`, JDK 17 and the Android SDK (or an APK, see below), on 
 3. Accept the **Allow USB debugging?** prompt on the TV (tick *Always allow*). The Control Center opens.
    Go to **Settings > Start HyperLauncher on start** to make it your Home.
 
+### Two editions
+
+| | **Full** (default) | **Lite** (`--lite`) |
+|---|---|---|
+| Launcher, Customize Launcher, wallpapers, hidden apps | yes | yes |
+| Monitor: memory and storage | yes | yes |
+| Monitor: CPU, top apps | yes | no (Android hides them from apps) |
+| Apps: Open, App info | yes | yes |
+| Apps: Force stop, Disable, uninstall system apps | yes (network ADB) | no |
+| Uninstall an app you installed | yes | yes, through Android's own dialog |
+| Debloat and Restore everything | yes (network ADB) | no |
+| Needs Network debugging on the TV | yes | **no** |
+| `INTERNET` permission | yes (only to reach the TV's own ADB) | **none** |
+
+Lite is built without the ADB client at all, so nothing in it can open a connection. Build it with
+`./install.sh 192.168.1.50 --lite` (`.\install.ps1 192.168.1.50 -Lite`). Installing still needs a way to sideload (`adb`, or any
+file-manager install); running it does not.
+
+With the Full edition, Network debugging opens port 5555 to your whole home network while it is on. The Control Center has a
+**Network debugging** card (Settings) with a *Turn off* button, so switch it off when you are done cleaning.
+
 Already have an APK? `./install.sh 192.168.1.50 path/to/app-debug.apk` skips the build and needs only `adb`.
 
 ## Use it by hand
@@ -69,7 +90,7 @@ Open the cloned folder in it and say:
 - Android 11+ *Wireless debugging* (random port, pairing code) is not supported; use *Network debugging* on port 5555.
 - Some Xiaomi / Mi TV firmware sends the Home button to its own launcher; HyperLauncher disables that stock launcher
   (not removes it) when you turn on *Start HyperLauncher on start*, and *Restore everything* brings it back.
-- Debug-signed build, minSdk 26, built with AGP 8.5 / Gradle 8.9 (JDK 17).
+- Debug-signed builds, minSdk 26, built with AGP 8.5 / Gradle 8.9 (JDK 17): `:app:assembleFullDebug` and `:app:assembleLiteDebug`.
 
 ## Credits and license
 

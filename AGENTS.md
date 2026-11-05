@@ -17,7 +17,7 @@ The TV needs Developer options with **USB debugging** and **Network debugging** 
 
 ```bash
 adb connect <TV_IP>:5555
-./install.sh <TV_IP>            # Windows: .\install.ps1 <TV_IP>; pass an APK path as 2nd argument to skip the build
+./install.sh <TV_IP> [--lite]   # Windows: .\install.ps1 <TV_IP> [-Lite]; pass an APK path to skip the build
 adb -s <TV_IP>:5555 shell am start -a android.intent.action.MAIN -c android.intent.category.HOME -n com.hyperlauncher.tv/com.gathin.tvhome.MainActivity
 ```
 
@@ -58,11 +58,13 @@ adb -s <TV_IP>:5555 logcat -d -s HyperTest
 ## Working on the code
 
 - Java + XML Views, no Compose (small TVs, 2 GB RAM). minSdk 26, targetSdk 34, AGP 8.5.2, Gradle 8.9, **JDK 17**.
-- Build: `./gradlew --no-daemon :app:assembleDebug -q` → `app/build/outputs/apk/debug/app-debug.apk`.
+- Two flavors: `full` (network ADB Control Center) and `lite` (no ADB client, no INTERNET permission). Build with
+  `./gradlew --no-daemon :app:assembleFullDebug :app:assembleLiteDebug -q` → `app/build/outputs/apk/{full,lite}/debug/app-{full,lite}-debug.apk`.
+  `BuildConfig.ADB` gates the Control Center; the real `AdbClient` is in `app/src/full`, a stub in `app/src/lite`. A change must work in both.
 - Map:
   - `app/src/main/java/com/hyperlauncher/control/ControlCenterActivity.java`: Control Center, built in code (side rail,
     Overview, Monitor, Apps, Debloat, Home & Theme, Settings).
-  - `.../control/AdbClient.java`: self-ADB over `127.0.0.1:5555` (CNXN/AUTH/OPEN/WRTE, RSA key in the app's files).
+  - `app/src/full/.../control/AdbClient.java`: self-ADB over `127.0.0.1:5555` (CNXN/AUTH/OPEN/WRTE, RSA key in the app's files).
   - `app/src/main/java/com/gathin/tvhome/`: the launcher (`MainActivity`, `Config`), `Ui` (shared look), `Icons`
     (code-drawn icons), `LayoutSettingsActivity` ("Customize Launcher"), `WallpaperPickerActivity`, `HiddenAppsActivity`.
   - Launcher settings are in the `launcher_settings` SharedPreferences; bumping `Config.SETTINGS_REVISION_KEY` makes
