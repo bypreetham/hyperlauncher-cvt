@@ -57,6 +57,18 @@ With the Full edition, Network debugging opens port 5555 to your whole home netw
 
 Already have an APK? `./install.sh 192.168.1.50 path/to/app-debug.apk` skips the build and needs only `adb`.
 
+## Install Lite (no network debugging)
+
+The Lite edition never needs Network debugging, on the TV or in the app. To install it without turning debugging on either:
+
+1. On a PC, build the APK: `./gradlew :app:assembleLiteDebug` (JDK 17 and the Android SDK). It ends up in `app/build/outputs/apk/lite/debug/app-lite-debug.apk`.
+2. Copy the APK to a USB stick, plug it into the TV and open it with the TV's file manager (allow *Install unknown apps* for that file manager when asked).
+3. Open HyperLauncher, go to **Settings > Start HyperLauncher on start** and pick it as the Home screen in the TV's own settings.
+
+If you already use `adb`, `./install.sh <TV_IP> --lite` does steps 1 to 3 in one go, but that needs Network debugging on for the install only.
+
+Checked on a Xiaomi Mi TV (MiTV-AXSO2, Android TV 11): the Lite build installs over the Full one, the Control Center opens with the Overview, Apps (Open, App info, Uninstall) and Monitor pages and no Debloat or ADB entries, the Home key opens HyperLauncher, and after a reboot the Home key still opens it. Its APK has no `INTERNET` permission.
+
 ## Use it by hand
 
 Everything is in the Control Center (Home screen, top bar, or the app list):
