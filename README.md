@@ -67,7 +67,7 @@ The Lite edition never needs Network debugging, on the TV or in the app. To inst
 
 If you already use `adb`, `./install.sh <TV_IP> --lite` does steps 1 to 3 in one go, but that needs Network debugging on for the install only.
 
-Checked on a Xiaomi Mi TV (MiTV-AXSO2, Android TV 11): the Lite build installs over the Full one, the Control Center opens with the Overview, Apps (Open, App info, Uninstall) and Monitor pages and no Debloat or ADB entries, the Home key opens HyperLauncher, and after a reboot the Home key still opens it. Its APK has no `INTERNET` permission.
+Checked on a Xiaomi Mi TV (MiTV-AXSO2, Android TV 11): the Lite build installs over the Full one, the Control Center opens with the Overview and Apps (Open, App info, Uninstall) pages with no Debloat or ADB entries, the Home key opens HyperLauncher, and after a reboot the Home key still opens it. Its APK has no `INTERNET` permission.
 
 ## Use it by hand
 
